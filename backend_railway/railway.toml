@@ -1,0 +1,24 @@
+[build]
+builder = "nixpacks"
+buildCommand = "pip install -r requirements.txt"
+
+[deploy]
+startCommand = "python main.py"
+healthcheckPath = "/health"
+healthcheckTimeout = 60
+
+[[services]]
+name = "dezai-backend"
+port = 8000
+protocol = "http"
+
+[env]
+PORT = "8000"
+PYTHONUNBUFFERED = "true"
+PYTHONPATH = "/app"
+MAX_WORKERS = "1"  # Reduce for memory optimization
+LOG_LEVEL = "INFO"
+
+# Optional: Add GPU if available (Railway GPU tier)
+# [services.resources]
+# gpu = "small"  # or "medium", "large" for GPU acceleration
