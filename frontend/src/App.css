@@ -431,3 +431,58 @@ input:focus-visible {
   border-radius: 50%;
   animation: spin 1s linear infinite;
 }
+
+/* ============================================
+   AUTH MODAL STYLES
+   ============================================ */
+
+.auth-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(10px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.auth-modal {
+  background: var(--bg-card);
+  border-radius: var(--radius-lg);
+  padding: 32px;
+  width: 90%;
+  max-width: 400px;
+  border: 1px solid var(--border-subtle);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.auth-toggle-button {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.auth-toggle-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(255, 106, 0, 0.3);
+}
+
+.auth-toggle-button:active {
+  transform: translateY(0);
+}

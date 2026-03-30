@@ -4,6 +4,9 @@
 
 [build.environment]
   NODE_VERSION = "18"
+  VITE_SUPABASE_URL = "https://your-project.supabase.co"
+  VITE_SUPABASE_ANON_KEY = "your-anon-key-here"
+  VITE_DEMUCS_API_URL = "https://your-demucs-api.herokuapp.com"
 
 [[redirects]]
   from = "/*"
@@ -17,8 +20,15 @@
     X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+    Content-Security-Policy = "default-src 'self' https://*.supabase.co https://*.netlify.app; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; media-src 'self' https:; connect-src 'self' https://*.supabase.co https://your-demucs-api.herokuapp.com"
 
 [dev]
   command = "npm run dev"
-  port = 5173
+  port = 5175
   publish = "dist"
+
+[functions]
+  directory = "netlify/functions"
+
+[[plugins]]
+  package = "@netlify/plugin-lighthouse"

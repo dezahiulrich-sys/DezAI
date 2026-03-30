@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import Auth from './components/Auth';
 import './App.css';
 
 function App() {
@@ -7,6 +8,13 @@ function App() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [user, setUser] = useState<any>(null);
+  const [showAuth, setShowAuth] = useState(false);
+  const [results, setResults] = useState<any>(null);
+  const [playingAudio, setPlayingAudio] = useState<string | null>(null);
+  const [playingOriginal, setPlayingOriginal] = useState<boolean>(false);
+  const [audioContext, setAudioContext] = useState<AudioContext | null>(null);
+  const [audioBuffers, setAudioBuffers] = useState<Map<string, AudioBuffer>>(new Map());
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Splash screen timer
@@ -38,6 +46,7 @@ function App() {
   const handleFileSelect = async (file: File) => {
     setSelectedFile(file);
     setIsProcessing(true);
+    setResults(null);
     
     try {
       // Create a FormData object to send the file
@@ -55,14 +64,47 @@ function App() {
       }
       
       const result = await response.json();
-      alert(`File "${file.name}" processed successfully!\nBPM: ${result.analysis?.bpm || 'N/A'}\nKey: ${result.analysis?.key || 'N/A'}`);
+      setResults(result);
     } catch (error) {
       console.error('Error processing file:', error);
       alert(`Error processing file: ${error instanceof Error ? error.message : 'Unknown error'}`);
       
       // Fallback to simulation if API fails
       setTimeout(() => {
-        alert(`File "${file.name}" processed with simulated results!\nBPM: 128\nKey: C minor`);
+        const simulatedResult = {
+          success: true,
+          message: `File "${file.name}" processed with simulated results!`,
+          analysis: {
+            bpm: 128,
+            key: 'C minor',
+            duration: 120.0,
+            energy: 0.78,
+            genre: 'trap',
+            style: 'boom bap',
+            rhythm: { kick: 64, snare: 32, hihat: 128, shaker: 96 }
+          },
+          stems: {
+            vocals: 'stems/vocals.wav',
+            drums: 'stems/drums.wav',
+            bass: 'stems/bass.wav',
+            other: 'stems/other.wav',
+            kick: 'stems/kick.wav',
+            snare: 'stems/snare.wav',
+            hihat: 'stems/hihat.wav',
+            shaker: 'stems/shaker.wav'
+          },
+          midi: {
+            melody: 'midi/melody.mid',
+            bass: 'midi/bass.mid',
+            chords: 'midi/chords.mid',
+            drums: 'midi/drums.mid',
+            kick: 'midi/kick.mid',
+            snare: 'midi/snare.mid',
+            hihat: 'midi/hihat.mid',
+            shaker: 'midi/shaker.mid'
+          }
+        };
+        setResults(simulatedResult);
       }, 2000);
     } finally {
       setIsProcessing(false);
@@ -78,6 +120,61 @@ function App() {
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
+  };
+
+  // Initialize Audio Context
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      setAudioContext(ctx);
+      return () => {
+        ctx.close();
+      };
+    }
+  }, []);
+
+  const playAudio = async (audioUrl: string, stemName: string) => {
+    if (!audioContext) {
+      alert('Audio context not initialized');
+      return;
+    }
+
+    try {
+      // For demo purposes, we'll create a simple oscillator
+      // In a real app, you would fetch the actual audio file
+      const oscillator = audioContext.createOscillator();
+      const gainNode = audioContext.createGain();
+      
+      oscillator.connect(gainNode);
+      gainNode.connect(audioContext.destination);
+      
+      oscillator.frequency.value = 440; // A4 note
+      oscillator.type = 'sine';
+      
+      gainNode.gain.value = 0.5;
+      
+      oscillator.start();
+      
+      // Stop after 2 seconds for demo
+      setTimeout(() => {
+        oscillator.stop();
+        if (stemName === 'original') {
+          setPlayingOriginal(false);
+        } else {
+          setPlayingAudio(null);
+        }
+      }, 2000);
+      
+      if (stemName === 'original') {
+        setPlayingOriginal(true);
+      } else {
+        setPlayingAudio(stemName);
+      }
+      
+    } catch (error) {
+      console.error('Error playing audio:', error);
+      alert(`Demo audio playing for ${stemName}. In production, this would play the actual audio file.`);
+    }
   };
 
   return (
@@ -173,7 +270,7 @@ function App() {
 
       {step === 'app' && (
         <main className="main">
-          {/* Header with Logo */}
+          {/* Header with Logo and Auth */}
           <header>
             <div className="header-container">
               <div className="header-left">
@@ -192,59 +289,70 @@ function App() {
                   Advanced Audio Analysis & MIDI Generation
                 </motion.p>
               </div>
-              <motion.div 
-                className="header-logo"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.3 }}
-              >
-                <svg viewBox="0 0 200 200" width="60" height="60" className="dezai-logo">
-                  <defs>
-                    <linearGradient id="logo-orange" x1="0%" y1="0%" x2="100%" y2="100%">
-                      <stop offset="0%" stopColor="#ffcc66" />
-                      <stop offset="50%" stopColor="#ff6a00" />
-                      <stop offset="100%" stopColor="#ff8f12" />
-                    </linearGradient>
-                    <linearGradient id="logo-green" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#00ffca" />
-                      <stop offset="100%" stopColor="#00b499" />
-                    </linearGradient>
-                    <filter id="logo-glow">
-                      <feGaussianBlur stdDeviation="3" result="coloredBlur" />
-                      <feMerge>
-                        <feMergeNode in="coloredBlur" />
-                        <feMergeNode in="SourceGraphic" />
-                      </feMerge>
-                    </filter>
-                  </defs>
-                  
-                  <path
-                    d="M40 30 L40 170 Q40 195 65 195 L125 195 Q165 195 165 150 L165 50 Q165 15 120 15 L58 15 Q40 15 40 30 Z"
-                    fill="url(#logo-orange)"
-                    stroke="rgba(255,255,255,0.3)"
-                    strokeWidth="2"
-                    filter="url(#logo-glow)"
-                  />
-                  
-                  <path
-                    d="M62 45 C95 45 115 75 115 105 C115 135 95 165 62 165"
-                    fill="none"
-                    stroke="url(#logo-green)"
-                    strokeWidth="5"
-                    strokeLinecap="round"
-                  />
-                  
-                  <path
-                    className="logo-pulse"
-                    d="M66 80 L78 95 L90 70 L102 100 L114 75 L126 95"
-                    fill="none"
-                    stroke="rgba(0,255,200,0.9)"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </motion.div>
+              <div className="header-right">
+                <motion.div 
+                  className="header-logo"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <svg viewBox="0 0 200 200" width="60" height="60" className="dezai-logo">
+                    <defs>
+                      <linearGradient id="logo-orange" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stopColor="#ffcc66" />
+                        <stop offset="50%" stopColor="#ff6a00" />
+                        <stop offset="100%" stopColor="#ff8f12" />
+                      </linearGradient>
+                      <linearGradient id="logo-green" x1="0%" y1="0%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#00ffca" />
+                        <stop offset="100%" stopColor="#00b499" />
+                      </linearGradient>
+                      <filter id="logo-glow">
+                        <feGaussianBlur stdDeviation="3" result="coloredBlur" />
+                        <feMerge>
+                          <feMergeNode in="coloredBlur" />
+                          <feMergeNode in="SourceGraphic" />
+                        </feMerge>
+                      </filter>
+                    </defs>
+                    
+                    <path
+                      d="M40 30 L40 170 Q40 195 65 195 L125 195 Q165 195 165 150 L165 50 Q165 15 120 15 L58 15 Q40 15 40 30 Z"
+                      fill="url(#logo-orange)"
+                      stroke="rgba(255,255,255,0.3)"
+                      strokeWidth="2"
+                      filter="url(#logo-glow)"
+                    />
+                    
+                    <path
+                      d="M62 45 C95 45 115 75 115 105 C115 135 95 165 62 165"
+                      fill="none"
+                      stroke="url(#logo-green)"
+                      strokeWidth="5"
+                      strokeLinecap="round"
+                    />
+                    
+                    <path
+                      className="logo-pulse"
+                      d="M66 80 L78 95 L90 70 L102 100 L114 75 L126 95"
+                      fill="none"
+                      stroke="rgba(0,255,200,0.9)"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </motion.div>
+                <motion.button
+                  className="auth-toggle-button"
+                  onClick={() => setShowAuth(!showAuth)}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: 0.4 }}
+                >
+                  {user ? `👤 ${user.email?.split('@')[0]}` : '🔐 Sign In'}
+                </motion.button>
+              </div>
             </div>
           </header>
 
@@ -291,11 +399,126 @@ function App() {
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                style={{ marginTop: '20px', padding: '12px', background: 'rgba(255, 106, 0, 0.1)', borderRadius: '8px' }}
+                style={{ marginTop: '20px', padding: '16px', background: 'rgba(255, 106, 0, 0.1)', borderRadius: '10px', border: '1px solid rgba(255, 106, 0, 0.3)' }}
               >
-                <p style={{ margin: 0, color: '#00FFCA' }}>
-                  Selected: <strong>{selectedFile.name}</strong>
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                  <div>
+                    <p style={{ margin: 0, color: '#00FFCA', fontWeight: 'bold', fontSize: '16px' }}>
+                      📁 {selectedFile.name}
+                    </p>
+                    <p style={{ margin: '4px 0 0 0', color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px' }}>
+                      Size: {(selectedFile.size / 1024 / 1024).toFixed(2)} MB • Type: {selectedFile.type}
+                    </p>
+                  </div>
+                  <button
+                    style={{
+                      background: playingOriginal ? 'rgba(255, 106, 0, 0.3)' : 'linear-gradient(135deg, #FF6A00, #FF8F12)',
+                      color: 'white',
+                      border: 'none',
+                      padding: '10px 20px',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: 'bold',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      minWidth: '120px',
+                      justifyContent: 'center'
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation(); // Empêche le déclenchement de l'upload
+                      if (playingOriginal) {
+                        setPlayingOriginal(false);
+                      } else {
+                        playAudio(URL.createObjectURL(selectedFile), 'original');
+                      }
+                    }}
+                  >
+                    {playingOriginal ? '⏸️ Stop' : '▶️ Play'}
+                  </button>
+                </div>
+                
+                {/* Audio Player Controls */}
+                <div style={{ marginTop: '12px', background: 'rgba(0, 0, 0, 0.2)', padding: '12px', borderRadius: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                        <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px' }}>Progress</span>
+                        <span style={{ color: '#00FFCA', fontSize: '12px' }}>0:00 / 2:30</span>
+                      </div>
+                      <div style={{ 
+                        width: '100%', 
+                        height: '4px', 
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        borderRadius: '2px',
+                        position: 'relative',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          position: 'absolute',
+                          left: '0',
+                          top: '0',
+                          height: '100%',
+                          width: playingOriginal ? '40%' : '0%',
+                          background: 'linear-gradient(90deg, #FF6A00, #00FFCA)',
+                          borderRadius: '2px',
+                          transition: 'width 0.3s ease'
+                        }}></div>
+                      </div>
+                    </div>
+                    
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <button
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          color: '#00FFCA',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => alert('Rewind 10 seconds')}
+                      >
+                        ⏪
+                      </button>
+                      
+                      <button
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          border: '1px solid rgba(255, 255, 255, 0.2)',
+                          color: '#00FFCA',
+                          width: '32px',
+                          height: '32px',
+                          borderRadius: '50%',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center'
+                        }}
+                        onClick={() => alert('Fast forward 10 seconds')}
+                      >
+                        ⏩
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div style={{ marginTop: '12px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ color: 'rgba(255, 255, 255, 0.7)', fontSize: '12px', minWidth: '60px' }}>Volume:</span>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      defaultValue="80"
+                      style={{ flex: 1, height: '6px', background: 'rgba(255, 106, 0, 0.3)', borderRadius: '3px' }}
+                      onChange={(e) => alert(`Volume set to ${e.target.value}%`)}
+                    />
+                    <span style={{ color: '#00FFCA', fontSize: '12px', minWidth: '30px' }}>80%</span>
+                  </div>
+                </div>
               </motion.div>
             )}
           </motion.div>
@@ -314,8 +537,422 @@ function App() {
             </motion.div>
           )}
 
+          {/* Results Display */}
+          {results && !isProcessing && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
+              style={{ marginTop: '32px' }}
+            >
+              <div className="card">
+                <h2>🎯 Analysis Results</h2>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginTop: '16px' }}>
+                  <div style={{ background: 'rgba(255, 106, 0, 0.1)', padding: '16px', borderRadius: '8px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#FF6A00' }}>BPM</h3>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#00FFCA', margin: 0 }}>
+                      {results.analysis?.bpm || 'N/A'}
+                    </p>
+                  </div>
+                  <div style={{ background: 'rgba(0, 180, 153, 0.1)', padding: '16px', borderRadius: '8px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#00B499' }}>Key</h3>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#00FFCA', margin: 0 }}>
+                      {results.analysis?.key || 'N/A'}
+                    </p>
+                  </div>
+                  <div style={{ background: 'rgba(255, 140, 18, 0.1)', padding: '16px', borderRadius: '8px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#FF8F12' }}>Duration</h3>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#00FFCA', margin: 0 }}>
+                      {results.analysis?.duration ? `${results.analysis.duration}s` : 'N/A'}
+                    </p>
+                  </div>
+                  <div style={{ background: 'rgba(0, 255, 202, 0.1)', padding: '16px', borderRadius: '8px' }}>
+                    <h3 style={{ margin: '0 0 8px 0', color: '#00FFCA' }}>Energy</h3>
+                    <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#00FFCA', margin: 0 }}>
+                      {results.analysis?.energy ? `${(results.analysis.energy * 100).toFixed(0)}%` : 'N/A'}
+                    </p>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '24px' }}>
+                  <h3>🎵 Stem Separation & Audio Player</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '16px' }}>
+                    {Object.entries(results.stems || {}).map(([stem, path]) => (
+                      <div key={stem} style={{ 
+                        background: 'rgba(255, 255, 255, 0.05)', 
+                        padding: '16px', 
+                        borderRadius: '10px',
+                        border: '1px solid rgba(255, 106, 0, 0.2)',
+                        position: 'relative'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
+                          <div style={{ 
+                            width: '32px', 
+                            height: '32px', 
+                            background: 'linear-gradient(135deg, #FF6A00, #00FFCA)',
+                            borderRadius: '6px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '14px',
+                            fontWeight: 'bold'
+                          }}>
+                            {stem === 'vocals' ? '🎤' : 
+                             stem === 'drums' ? '🥁' : 
+                             stem === 'bass' ? '🎸' : 
+                             stem === 'kick' ? '👢' :
+                             stem === 'snare' ? '🥁' :
+                             stem === 'hihat' ? '🔔' :
+                             stem === 'shaker' ? '🎲' : '🎵'}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <span style={{ fontWeight: 'bold', color: '#00FFCA', fontSize: '16px' }}>
+                              {stem.charAt(0).toUpperCase() + stem.slice(1)}
+                            </span>
+                            <p style={{ margin: '4px 0 0 0', fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                              {typeof path === 'string' ? path : 'Audio file'}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        {/* Audio Player Controls */}
+                        <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
+                          <button
+                            style={{
+                              flex: 1,
+                              background: playingAudio === stem ? 'rgba(255, 106, 0, 0.3)' : 'rgba(255, 106, 0, 0.1)',
+                              border: '1px solid rgba(255, 106, 0, 0.5)',
+                              color: playingAudio === stem ? '#FF6A00' : '#00FFCA',
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '14px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: '6px'
+                            }}
+                            onClick={() => {
+                              if (playingAudio === stem) {
+                                setPlayingAudio(null);
+                                alert(`Stopped playing ${stem}`);
+                              } else {
+                                setPlayingAudio(stem);
+                                alert(`Playing ${stem} audio...`);
+                              }
+                            }}
+                          >
+                            {playingAudio === stem ? '⏸️ Stop' : '▶️ Play'}
+                          </button>
+                          
+                          <button
+                            style={{
+                              background: 'rgba(0, 180, 153, 0.1)',
+                              border: '1px solid rgba(0, 180, 153, 0.3)',
+                              color: '#00FFCA',
+                              padding: '8px 12px',
+                              borderRadius: '6px',
+                              cursor: 'pointer',
+                              fontSize: '14px'
+                            }}
+                            onClick={() => alert(`Downloading ${stem}.wav...`)}
+                          >
+                            ⬇️
+                          </button>
+                        </div>
+                        
+                        {/* Volume Slider */}
+                        <div style={{ marginTop: '12px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{ fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>Volume:</span>
+                            <input
+                              type="range"
+                              min="0"
+                              max="100"
+                              defaultValue="80"
+                              style={{ flex: 1, height: '4px', background: 'rgba(255, 106, 0, 0.3)', borderRadius: '2px' }}
+                              onChange={(e) => alert(`Volume set to ${e.target.value}% for ${stem}`)}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '24px' }}>
+                  <h3>🎚️ Audio Mixer</h3>
+                  <div style={{ 
+                    background: 'rgba(20, 20, 30, 0.8)', 
+                    padding: '20px', 
+                    borderRadius: '12px',
+                    border: '1px solid rgba(255, 106, 0, 0.3)',
+                    marginTop: '16px'
+                  }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
+                      {Object.entries(results.stems || {}).map(([stem, path]) => (
+                        <div key={`mixer-${stem}`} style={{ textAlign: 'center' }}>
+                          <div style={{ 
+                            width: '60px', 
+                            height: '120px', 
+                            background: 'linear-gradient(to top, rgba(255, 106, 0, 0.3), rgba(0, 180, 153, 0.3))',
+                            borderRadius: '8px',
+                            margin: '0 auto 12px auto',
+                            position: 'relative',
+                            overflow: 'hidden'
+                          }}>
+                            <div style={{
+                              position: 'absolute',
+                              bottom: '0',
+                              left: '0',
+                              right: '0',
+                              height: '80%',
+                              background: 'linear-gradient(to top, #FF6A00, #00FFCA)',
+                              borderRadius: '8px 8px 0 0'
+                            }}></div>
+                            <div style={{
+                              position: 'absolute',
+                              top: '10px',
+                              left: '0',
+                              right: '0',
+                              textAlign: 'center',
+                              color: 'white',
+                              fontSize: '10px',
+                              fontWeight: 'bold'
+                            }}>
+                              80%
+                            </div>
+                          </div>
+                          <div style={{ 
+                            width: '60px', 
+                            height: '4px', 
+                            background: 'rgba(255, 255, 255, 0.2)',
+                            borderRadius: '2px',
+                            margin: '8px auto',
+                            position: 'relative'
+                          }}>
+                            <div style={{
+                              position: 'absolute',
+                              top: '-6px',
+                              width: '12px',
+                              height: '16px',
+                              background: '#00FFCA',
+                              borderRadius: '3px',
+                              cursor: 'pointer',
+                              left: '80%'
+                            }}></div>
+                          </div>
+                          <span style={{ color: '#00FFCA', fontSize: '14px', fontWeight: 'bold' }}>
+                            {stem.charAt(0).toUpperCase() + stem.slice(1)}
+                          </span>
+                          <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'center', gap: '8px' }}>
+                            <button
+                              style={{
+                                background: playingAudio === stem ? 'rgba(255, 106, 0, 0.5)' : 'rgba(255, 106, 0, 0.2)',
+                                border: 'none',
+                                color: 'white',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                              onClick={() => {
+                                if (playingAudio === stem) {
+                                  setPlayingAudio(null);
+                                } else {
+                                  setPlayingAudio(stem);
+                                }
+                              }}
+                            >
+                              {playingAudio === stem ? '⏸️' : '▶️'}
+                            </button>
+                            <button
+                              style={{
+                                background: 'rgba(0, 180, 153, 0.2)',
+                                border: 'none',
+                                color: '#00FFCA',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                              onClick={() => alert(`Solo ${stem}`)}
+                            >
+                              S
+                            </button>
+                            <button
+                              style={{
+                                background: 'rgba(255, 0, 0, 0.2)',
+                                border: 'none',
+                                color: '#FF6A00',
+                                width: '24px',
+                                height: '24px',
+                                borderRadius: '4px',
+                                cursor: 'pointer',
+                                fontSize: '12px'
+                              }}
+                              onClick={() => alert(`Mute ${stem}`)}
+                            >
+                              M
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '12px' }}>
+                      <button
+                        style={{
+                          background: 'linear-gradient(135deg, #FF6A00, #FF8F12)',
+                          color: 'white',
+                          border: 'none',
+                          padding: '10px 20px',
+                          borderRadius: '6px',
+                          cursor: 'pointer',
+                          fontWeight: 'bold'
+                        }}
+                        onClick={() => {
+                          setPlayingAudio(null);
+                          alert('Playing all stems together...');
+                        }}
+                      >
+                        ▶️ Play All
+                      </button>
+                      <button
+                        style={{
+                          background: 'rgba(255, 255, 255, 0.1)',
+                          color: '#00FFCA',
+                          border: '1px solid rgba(0, 255, 202, 0.3)',
+                          padding: '10px 20px',
+                          borderRadius: '6px',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => alert('Exporting mixed audio...')}
+                      >
+                        💾 Export Mix
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '24px' }}>
+                  <h3>🎹 MIDI Files</h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '12px', marginTop: '12px' }}>
+                    {Object.entries(results.midi || {}).map(([instrument, path]) => (
+                      <div key={instrument} style={{ 
+                        background: 'rgba(0, 180, 153, 0.1)', 
+                        padding: '12px', 
+                        borderRadius: '8px',
+                        border: '1px solid rgba(0, 180, 153, 0.3)'
+                      }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                          <div style={{ 
+                            width: '24px', 
+                            height: '24px', 
+                            background: 'linear-gradient(135deg, #00B499, #00FFCA)',
+                            borderRadius: '4px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            color: 'white',
+                            fontSize: '12px'
+                          }}>
+                            🎵
+                          </div>
+                          <span style={{ fontWeight: 'bold', color: '#00FFCA' }}>
+                            {instrument.charAt(0).toUpperCase() + instrument.slice(1)}
+                          </span>
+                        </div>
+                        <p style={{ margin: 0, fontSize: '12px', color: 'rgba(255, 255, 255, 0.7)' }}>
+                          {typeof path === 'string' ? path : 'MIDI file'}
+                        </p>
+                        <button 
+                          style={{
+                            marginTop: '8px',
+                            background: 'rgba(0, 180, 153, 0.2)',
+                            border: '1px solid rgba(0, 180, 153, 0.5)',
+                            color: '#00FFCA',
+                            padding: '6px 12px',
+                            borderRadius: '4px',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            width: '100%'
+                          }}
+                          onClick={() => alert(`Download ${instrument}.mid`)}
+                        >
+                          Download MIDI
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '24px', padding: '16px', background: 'rgba(255, 106, 0, 0.05)', borderRadius: '8px' }}>
+                  <h3 style={{ margin: '0 0 12px 0', color: '#FF6A00' }}>🎶 Additional Info</h3>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px' }}>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Genre: </span>
+                      <span style={{ color: '#00FFCA', fontWeight: 'bold' }}>{results.analysis?.genre || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Style: </span>
+                      <span style={{ color: '#00FFCA', fontWeight: 'bold' }}>{results.analysis?.style || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span style={{ color: 'rgba(255, 255, 255, 0.7)' }}>Status: </span>
+                      <span style={{ color: '#00FFCA', fontWeight: 'bold' }}>{results.success ? '✅ Success' : '❌ Failed'}</span>
+                    </div>
+                  </div>
+                  <p style={{ marginTop: '12px', color: 'rgba(255, 255, 255, 0.7)', fontSize: '14px' }}>
+                    {results.message || 'Processing completed successfully'}
+                  </p>
+                  
+                  <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
+                    <button
+                      style={{
+                        background: 'linear-gradient(135deg, #FF6A00, #FF8F12)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '10px 20px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        flex: 1
+                      }}
+                      onClick={() => {
+                        // In a real app, this would download the stems
+                        alert('Downloading all stems and MIDI files...');
+                      }}
+                    >
+                      📥 Download All
+                    </button>
+                    <button
+                      style={{
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: '#00FFCA',
+                        border: '1px solid rgba(0, 255, 202, 0.3)',
+                        padding: '10px 20px',
+                        borderRadius: '6px',
+                        cursor: 'pointer',
+                        flex: 1
+                      }}
+                      onClick={() => {
+                        setResults(null);
+                        setSelectedFile(null);
+                      }}
+                    >
+                      🔄 New Analysis
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           {/* Demo Content */}
-          <div className="card" style={{ marginTop: '32px' }}>
+          <div className="card" style={{ marginTop: results ? '16px' : '32px' }}>
             <h2>🎵 Features</h2>
             <ul style={{ listStyle: 'none', padding: 0 }}>
               <li>✅ BPM Detection</li>
@@ -334,6 +971,32 @@ function App() {
               <strong>DezAI</strong> - Professional Audio Analysis for Music Producers
             </p>
           </div>
+
+          {/* Auth Modal */}
+          <AnimatePresence>
+            {showAuth && (
+              <motion.div
+                className="auth-modal-overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setShowAuth(false)}
+              >
+                <motion.div
+                  className="auth-modal"
+                  initial={{ opacity: 0, scale: 0.9, y: 20 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9, y: 20 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Auth onAuthChange={(user) => {
+                    setUser(user);
+                    if (user) setShowAuth(false);
+                  }} />
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </main>
       )}
     </div>
