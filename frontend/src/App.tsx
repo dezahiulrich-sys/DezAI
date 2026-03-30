@@ -134,51 +134,147 @@ function App() {
   }, []);
 
   const playAudio = async (audioUrl: string, stemName: string) => {
-    if (!audioContext) {
-      alert('Audio context not initialized');
-      return;
-    }
-
+    console.log('playAudio called:', stemName, 'audioUrl:', audioUrl);
+    
     try {
-      // For demo purposes, we'll create a simple oscillator
-      // In a real app, you would fetch the actual audio file
-      const oscillator = audioContext.createOscillator();
-      const gainNode = audioContext.createGain();
-      
-      oscillator.connect(gainNode);
-      gainNode.connect(audioContext.destination);
-      
-      oscillator.frequency.value = 440; // A4 note
-      oscillator.type = 'sine';
-      
-      gainNode.gain.value = 0.5;
-      
-      oscillator.start();
-      
-      // Stop after 2 seconds for demo
-      setTimeout(() => {
-        oscillator.stop();
-        if (stemName === 'original') {
+      // If we're playing the original file (uploaded file)
+      if (stemName === 'original' && selectedFile) {
+        if (playingOriginal) {
+          // Stop playing
           setPlayingOriginal(false);
-        } else {
-          setPlayingAudio(null);
+          return;
         }
-      }, 2000);
-      
-      if (stemName === 'original') {
-        setPlayingOriginal(true);
+        
+        // Create audio element for simple playback
+        const audio = new Audio(URL.createObjectURL(selectedFile));
+        audio.volume = 0.7;
+        
+        audio.onplay = () => {
+          setPlayingOriginal(true);
+          console.log('Started playing original file');
+        };
+        
+        audio.onended = () => {
+          setPlayingOriginal(false);
+          console.log('Finished playing original file');
+        };
+        
+        audio.onerror = (e) => {
+          console.error('Error playing audio:', e);
+          setPlayingOriginal(false);
+          alert('Error playing audio file. Please try again.');
+        };
+        
+        await audio.play();
+        
       } else {
+        // For stems, we need to fetch from the server
+        if (playingAudio === stemName) {
+          // Stop playing
+          setPlayingAudio(null);
+          return;
+        }
+        
+        // Create a simple test tone for stems (since we don't have actual stem files yet)
+        if (!audioContext) {
+          console.error('AudioContext not initialized');
+          alert('Audio context not initialized. Please refresh the page.');
+          return;
+        }
+        
+        // Resume audio context if suspended
+        if (audioContext.state === 'suspended') {
+          await audioContext.resume();
+        }
+        
+        // Create oscillator for demo audio
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+        
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+        
+        // Different frequencies for different stems
+        let frequency = 440;
+        let duration = 2000;
+        
+        switch(stemName) {
+          case 'vocals': frequency = 523.25; duration = 1500; break;
+          case 'drums': frequency = 392; duration = 1000; break;
+          case 'bass': frequency = 261.63; duration = 2500; break;
+          case 'kick': frequency = 65.41; duration = 800; break;
+          case 'snare': frequency = 155.56; duration = 600; break;
+          case 'hihat': frequency = 830.61; duration = 400; break;
+          case 'shaker': frequency = 1046.50; duration = 300; break;
+          case 'other': frequency = 329.63; duration = 1800; break;
+          default: frequency = 440; duration = 2000;
+        }
+        
+        oscillator.frequency.value = frequency;
+        oscillator.type = stemName.includes('drums') || stemName === 'kick' || stemName === 'snare' ? 'square' : 'sine';
+        gainNode.gain.value = 0.5;
+        
+        oscillator.start();
+        
+        // Stop after duration
+        setTimeout(() => {
+          oscillator.stop();
+          setPlayingAudio(null);
+        }, duration);
+        
         setPlayingAudio(stemName);
+        console.log(`Playing demo tone for ${stemName}: ${frequency}Hz`);
       }
       
     } catch (error) {
       console.error('Error playing audio:', error);
-      alert(`Demo audio playing for ${stemName}. In production, this would play the actual audio file.`);
+      alert(`Error playing audio: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
+  };
+
+  // Test function for audio
+  const testAudio = () => {
+    console.log('Testing audio...');
+    if (!audioContext) {
+      alert('AudioContext not initialized');
+      return;
+    }
+    
+    // Create a simple test tone
+    const oscillator = audioContext.createOscillator();
+    const gainNode = audioContext.createGain();
+    
+    oscillator.connect(gainNode);
+    gainNode.connect(audioContext.destination);
+    
+    oscillator.frequency.value = 440; // A4
+    oscillator.type = 'sine';
+    gainNode.gain.value = 0.5;
+    
+    oscillator.start();
+    
+    // Stop after 1 second
+    setTimeout(() => {
+      oscillator.stop();
+      alert('Test audio played successfully! Check your speakers/headphones.');
+    }, 1000);
   };
 
   return (
     <div className="container">
+      {/* Aurora Borealis Background Effect */}
+      <div className="aurora-borealis">
+        <div className="aurora-layer aurora-layer-1" />
+        <div className="aurora-layer aurora-layer-2" />
+        <div className="aurora-layer aurora-layer-3" />
+        <div className="aurora-streaks" />
+        <div className="aurora-particles">
+          {[...Array(12)].map((_, i) => (
+            <div key={i} className="aurora-particle" />
+          ))}
+        </div>
+      </div>
+
       <AnimatePresence>
         {step === 'splash' && (
           <motion.div
@@ -439,7 +535,7 @@ function App() {
                 </div>
                 
                 {/* Audio Player Controls */}
-                <div style={{ marginTop: '12px', background: 'rgba(0, 0, 0, 0.2)', padding: '12px', borderRadius: '8px' }}>
+                <div style={{ marginTop: '12px', background: 'rgba(20, 20, 30, 0.3)', padding: '12px', borderRadius: '8px', backdropFilter: 'blur(10px)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
@@ -579,11 +675,12 @@ function App() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '16px' }}>
                     {Object.entries(results.stems || {}).map(([stem, path]) => (
                       <div key={stem} style={{ 
-                        background: 'rgba(255, 255, 255, 0.05)', 
+                        background: 'rgba(20, 20, 30, 0.3)', 
                         padding: '16px', 
                         borderRadius: '10px',
                         border: '1px solid rgba(255, 106, 0, 0.2)',
-                        position: 'relative'
+                        position: 'relative',
+                        backdropFilter: 'blur(5px)'
                       }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '12px' }}>
                           <div style={{ 
@@ -636,10 +733,8 @@ function App() {
                             onClick={() => {
                               if (playingAudio === stem) {
                                 setPlayingAudio(null);
-                                alert(`Stopped playing ${stem}`);
                               } else {
-                                setPlayingAudio(stem);
-                                alert(`Playing ${stem} audio...`);
+                                playAudio(`stems/${stem}.wav`, stem);
                               }
                             }}
                           >
@@ -684,11 +779,12 @@ function App() {
                 <div style={{ marginTop: '24px' }}>
                   <h3>🎚️ Audio Mixer</h3>
                   <div style={{ 
-                    background: 'rgba(20, 20, 30, 0.8)', 
+                    background: 'rgba(20, 20, 30, 0.4)', 
                     padding: '20px', 
                     borderRadius: '12px',
                     border: '1px solid rgba(255, 106, 0, 0.3)',
-                    marginTop: '16px'
+                    marginTop: '16px',
+                    backdropFilter: 'blur(10px)'
                   }}>
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '16px' }}>
                       {Object.entries(results.stems || {}).map(([stem, path]) => (
@@ -952,22 +1048,77 @@ function App() {
           )}
 
           {/* Demo Content */}
-          <div className="card" style={{ marginTop: results ? '16px' : '32px' }}>
-            <h2>🎵 Features</h2>
-            <ul style={{ listStyle: 'none', padding: 0 }}>
-              <li>✅ BPM Detection</li>
-              <li>✅ Key/Tonalité Analysis</li>
-              <li>✅ Stem Separation (Vocals, Drums, Bass, Other)</li>
-              <li>✅ MIDI Generation for all instruments</li>
-              <li>✅ FL Studio Compatible MIDI Files</li>
-              <li>✅ Groove Intelligence (Swing, Subdivisions)</li>
+          <div style={{ 
+            marginTop: results ? '16px' : '32px', 
+            padding: '24px', 
+            background: 'rgba(20, 20, 30, 0.3)', 
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 106, 0, 0.2)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h2 style={{ color: '#00FFCA', marginBottom: '16px' }}>🎵 Features</h2>
+            <ul style={{ listStyle: 'none', padding: 0, color: 'rgba(255, 255, 255, 0.9)' }}>
+              <li style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#FF6A00' }}>✅</span> BPM Detection
+              </li>
+              <li style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#FF6A00' }}>✅</span> Key/Tonalité Analysis
+              </li>
+              <li style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#FF6A00' }}>✅</span> Stem Separation (Vocals, Drums, Bass, Other)
+              </li>
+              <li style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#FF6A00' }}>✅</span> MIDI Generation for all instruments
+              </li>
+              <li style={{ marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#FF6A00' }}>✅</span> FL Studio Compatible MIDI Files
+              </li>
+              <li style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span style={{ color: '#FF6A00' }}>✅</span> Groove Intelligence (Swing, Subdivisions)
+              </li>
             </ul>
           </div>
 
-          <div className="card" style={{ marginTop: '16px' }}>
-            <h2>🚀 Quick Start</h2>
-            <p>Upload an audio file to begin analysis. Supported formats: MP3, WAV, FLAC, AIFF, OGG.</p>
-            <p style={{ marginTop: '16px', color: '#00FFCA' }}>
+          <div style={{ 
+            marginTop: '16px', 
+            padding: '24px', 
+            background: 'rgba(20, 20, 30, 0.3)', 
+            borderRadius: '12px',
+            border: '1px solid rgba(255, 106, 0, 0.2)',
+            backdropFilter: 'blur(10px)'
+          }}>
+            <h2 style={{ color: '#00FFCA', marginBottom: '16px' }}>🚀 Quick Start</h2>
+            <p style={{ color: 'rgba(255, 255, 255, 0.9)', marginBottom: '16px' }}>
+              Upload an audio file to begin analysis. Supported formats: MP3, WAV, FLAC, AIFF, OGG.
+            </p>
+            
+            <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(255, 106, 0, 0.1)', borderRadius: '8px' }}>
+              <h3 style={{ color: '#FF6A00', marginBottom: '12px' }}>🔊 Audio Test</h3>
+              <p style={{ marginBottom: '16px', color: 'rgba(255, 255, 255, 0.8)' }}>
+                Test if audio playback is working on your system:
+              </p>
+              <button
+                style={{
+                  background: 'linear-gradient(135deg, #00FFCA, #00B499)',
+                  color: 'white',
+                  border: 'none',
+                  padding: '12px 24px',
+                  borderRadius: '6px',
+                  cursor: 'pointer',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  width: '100%'
+                }}
+                onClick={testAudio}
+              >
+                🔊 Test Audio Playback
+              </button>
+              <p style={{ marginTop: '12px', fontSize: '12px', color: 'rgba(255, 255, 255, 0.6)' }}>
+                Click this button to test if Web Audio API is working. You should hear a 440Hz tone for 1 second.
+              </p>
+            </div>
+            
+            <p style={{ marginTop: '16px', color: '#00FFCA', fontWeight: 'bold' }}>
               <strong>DezAI</strong> - Professional Audio Analysis for Music Producers
             </p>
           </div>
